@@ -103,7 +103,7 @@ jobs:
         run: ./.github/scripts/renovate-report.sh
 
       - name: Upload Renovate logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: ${{ ( success() || failure() ) && steps.renovate.conclusion != 'skipped' }}
         with:
           name: renovate-logs
