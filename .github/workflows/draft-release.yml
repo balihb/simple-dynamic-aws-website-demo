@@ -1,0 +1,38 @@
+name: Draft a Release
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '*.*.*'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  draft-release:
+    name: Draft Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: '0'
+
+      - name: Get version
+        uses: ./.github/actions/get-version
+        id: version
+
+      - uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          commit: ${{ github.ref_name }}
+          draft: true
+          generateReleaseNotes: true
+          makeLatest: ${{ github.ref_name }} == 'main'
+          name: ${{ steps.version.outputs.version }}
+          prerelease: ${{ github.ref_name }} != 'main'
+          tag: ${{ steps.version.outputs.version }}
+          updateOnlyUnreleased: true

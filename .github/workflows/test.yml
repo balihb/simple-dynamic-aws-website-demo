@@ -1,0 +1,117 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '*.*.*'
+  pull_request:
+    paths:
+      - '.checkov.yaml'
+      - '.github/actions/get-version/action.yml'
+      - '.github/workflows/test.yml'
+      - 'GitVersion.yml'
+      - 'sonar-project.properties'
+      - 'lambda/**'
+      - 'site/**'
+      - 'tox.ini'
+  workflow_dispatch:
+
+env:
+  # versions
+  # renovate: datasource=docker depName=python
+  PYTHON_VERSION: '3.14'
+  # renovate: datasource=pypi depName=tox
+  TOX_VERSION: '4.30.3'
+
+  # generic
+  FORCE_COLOR: '1'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  PIP_PROGRESS_BAR: 'off'
+  PYTHONUNBUFFERED: '1'
+  PY_COLORS: '1'
+  TERM: ansi
+  TOX_SKIP_ENV: 'clean'
+
+  # cache
+  PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+  SONAR_USER_HOME: ${{ github.workspace }}/.cache/sonar
+  TF_DATA_DIR: ${{ github.workspace }}/.cache/terraform-data
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.cache/terraform-plugin
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+  npm_config_cache: ${{ github.workspace }}/.cache/npm
+
+permissions: read-all
+
+jobs:
+  test:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: '0'
+
+      - name: Get version
+        uses: ./.github/actions/get-version
+        id: version
+
+      - name: Cache test
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PIP_CACHE_DIR }}
+            ${{ env.SONAR_USER_HOME }}/cache
+            ${{ env.TF_DATA_DIR }}
+            ${{ env.TF_PLUGIN_CACHE_DIR }}
+            ${{ env.XDG_CACHE_HOME }}
+            ${{ env.npm_config_cache }}
+            ${{ github.workspace }}/.cache/checkov
+            ${{ github.workspace }}/.tox
+          key: test-${{ env.PYTHON_VERSION }}-${{ env.TOX_VERSION }}-${{ hashFiles('versions.tf') }}-${{ hashFiles('tox.ini') }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Tox
+        run: pip install tox==${{ env.TOX_VERSION }}
+
+      - name: Run Tox
+        continue-on-error: true
+        run: tox
+
+      - name: Checkov GitHub Action
+        uses: bridgecrewio/checkov-action@v12
+        continue-on-error: true
+        with:
+          output_format: sarif
+          output_file_path: .report/checkov
+          quiet: true
+          soft_fail: true
+
+      - name: Sonar
+        uses: sonarsource/sonarqube-scan-action@v6
+        id: sonar
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_USER_HOME: ${{ env.SONAR_USER_HOME }}
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ github.ref_type == 'tag' && github.ref_name || steps.version.outputs.version }}
+            -Dsonar.links.ci=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            -Dsonar.links.homepage=https://github.com/${{ github.repository }}
+            -Dsonar.links.issue=https://github.com/${{ github.repository }}/issues
+            -Dsonar.links.scm=${{ github.repositoryUrl }}
+            -Dsonar.sarifReportPaths=.report/checkov/results_sarif.sarif
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          include-hidden-files: true
+          path: |
+            .report

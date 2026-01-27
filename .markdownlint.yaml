@@ -1,0 +1,9 @@
+# https://github.com/igorshubovych/markdownlint-cli#configuration
+
+line-length:
+  # keep in sync with .editorconfig
+  line_length: 200
+no-bare-urls: false
+descriptive-link-text: false
+table-column-style: false
+no-inline-html: false

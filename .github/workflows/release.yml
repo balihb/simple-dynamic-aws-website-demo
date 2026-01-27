@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  release:
+    types: [ released ]
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: Destroy deployment?
+        type: boolean
+        default: false
+
+env:
+  # generic
+  FORCE_COLOR: '1'
+  TERM: ansi
+
+  # cache
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+  TF_DATA_DIR: ${{ github.workspace }}/.cache/terraform-data
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.cache/terraform-plugin
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ env.XDG_CACHE_HOME }}
+            ${{ env.TF_DATA_DIR }}
+            ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: release-${{ hashFiles('versions.tf') }}-${{ hashFiles('mise.toml') }}
+
+      - name: mkdir
+        run: |
+          mkdir -p ${{ env.TF_DATA_DIR }}
+          mkdir -p ${{ env.TF_PLUGIN_CACHE_DIR }}
+
+      - uses: jdx/mise-action@v3
+
+      - name: Configure AWS credentials (static keys)
+        run: |
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "AWS_REGION=${{ secrets.AWS_DEFAULT_REGION }}" >> $GITHUB_ENV
+
+      - name: Select S3 backend
+        run: |
+          cat > backend_override.tf <<'EOF'
+          terraform {
+            backend "s3" {}
+          }
+          EOF
+
+      - name: Init
+        run: |
+          terraform init \
+          -backend-config="bucket=simple-dynamic-aws-website-demo-tfstate" \
+          -backend-config="key=terraform.tfstate" \
+          -backend-config="region=eu-central-1"
+
+      - name: Plan
+        run: terraform plan
+
+      - name: Apply
+        if: ${{ ! inputs.destroy }}
+        run: terraform apply -auto-approve
+
+      - name: Destroy
+        if: ${{ inputs.destroy }}
+        run: terraform destroy -auto-approve

@@ -1,0 +1,9 @@
+# https://github.com/bridgecrewio/checkov#configuration-using-a-config-file
+download-external-modules: true
+evaluate-variables: true
+external-modules-download-path: .cache/checkov/.external_modules
+framework:
+  - all
+skip-path:
+  - .cache
+skip-check:

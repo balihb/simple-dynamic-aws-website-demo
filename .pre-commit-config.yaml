@@ -1,0 +1,112 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [ "--fix=lf" ]
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: check-yaml
+        args: [ --allow-multiple-documents ]
+        exclude: |
+          (?x)^(
+              .+/templates/.+\.ya?ml
+          )$
+      - id: check-ast
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.6.0
+    hooks:
+      - id: editorconfig-checker
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.36.0
+    hooks:
+      - id: check-github-workflows
+      - id: check-jsonschema
+        name: "Validate yamllint config"
+        files: ^\.yamllint\.ya?ml$
+        types: [ yaml ]
+        args:
+          - --schemafile
+          - https://json.schemastore.org/yamllint.json
+      - id: check-jsonschema
+        name: "Validate markdownlint config"
+        files: ^\.markdownlint\.ya?ml$
+        types: [ yaml ]
+        args:
+          - --schemafile
+          - https://raw.githubusercontent.com/DavidAnson/markdownlint/main/schema/markdownlint-config-schema.json
+      - id: check-renovate
+        additional_dependencies:
+          # renovate: datasource=pypi
+          - pyjson5==2.0.0
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+  - repo: https://github.com/eslint/eslint
+    rev: v9.33.0
+    hooks:
+      - id: eslint
+        additional_dependencies:
+          # renovate: datasource=npm
+          - eslint@9.33.0
+          # renovate: datasource=npm
+          - "@eslint/js@9.33.0"
+          # renovate: datasource=npm
+          - globals@16.3.0
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0
+    hooks:
+      - id: markdownlint
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      # fix imports
+      - id: ruff-check
+        name: ruff-check-imports
+        args: [ "check", "--select", "I", "--fix" ]
+      # fix other
+      - id: ruff-check
+        args: [ "--fix" ]
+      # format
+      - id: ruff-format
+  - repo: https://github.com/antonbabenko/pre-commit-terraform.git
+    rev: v1.105.0
+    hooks:
+      - id: terraform_fmt
+        args:
+          - --hook-config=--parallelism-ci-cpu-cores=1
+      - id: terraform_validate
+        name: Terraform validate (1st)
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+          - --hook-config=--parallelism-limit=1
+          - --hook-config=--parallelism-ci-cpu-cores=1
+          - --tf-init-args=-upgrade
+      - id: terraform_providers_lock
+        args:
+          - --args=-platform=darwin_amd64
+          - --args=-platform=linux_amd64
+          - --args=-platform=windows_amd64
+          - --hook-config=--mode=check-lockfile-is-cross-platform
+          - --hook-config=--parallelism-ci-cpu-cores=1
+      - id: terraform_validate
+        name: Terraform validate (2nd)
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+          - --hook-config=--parallelism-limit=1
+          - --hook-config=--parallelism-ci-cpu-cores=1
+          - --tf-init-args=-upgrade
+      - id: terraform_tflint
+        args:
+          - --hook-config=--parallelism-ci-cpu-cores=1
+  - repo: https://github.com/terraform-docs/terraform-docs
+    rev: v0.21.0
+    hooks:
+      - id: terraform-docs-system

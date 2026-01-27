@@ -1,0 +1,34 @@
+name: "get-version"
+description: "Get version"
+inputs:
+  gitversion_version:
+    required: true
+    description: "GitVersion version"
+    default: '6.4.0'
+  set_version:
+    required: true
+    description: "Set version in version file"
+    default: 'true'
+outputs:
+  version:
+    description: "Version"
+    value: ${{ steps.actual_version.outputs.version }}
+runs:
+  using: "composite"
+  steps:
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v4
+      with:
+        versionSpec: ${{ inputs.gitversion_version }}
+
+    - name: Determine Version
+      id: gitversion
+      uses: gittools/actions/gitversion/execute@v4
+      with:
+        disableCache: true
+
+    - name: Extract output
+      id: actual_version
+      shell: bash
+      run: |
+        echo "version=${{ github.ref_name == github.event.repository.default_branch && steps.gitversion.outputs.MajorMinorPatch || steps.gitversion.outputs.InformationalVersion }}" >> $GITHUB_OUTPUT

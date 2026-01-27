@@ -1,0 +1,75 @@
+name: Pre-commit
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - '*.*.*'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # version
+  # renovate: datasource=pypi depName=pre-commit
+  PRE_COMMIT_VERSION: '4.5.1'
+  # renovate: datasource=docker depName=python
+  PYTHON_VERSION: '3.14'
+
+  # generic
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  PIP_PROGRESS_BAR: 'off'
+  PYTHONUNBUFFERED: '1'
+
+  # cache
+  PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+  PRE_COMMIT_HOME: ${{ github.workspace }}/.cache/pre-commit
+  XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+  npm_config_cache: ${{ github.workspace }}/.cache/npm
+  TF_DATA_DIR: ${{ github.workspace }}/.cache/terraform-data
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.cache/terraform-plugin
+
+permissions: read-all
+
+jobs:
+  pre-commit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: '0'
+
+      - name: Cache pre-commit
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.PIP_CACHE_DIR }}
+            ${{ env.PRE_COMMIT_HOME }}
+            ${{ env.TF_DATA_DIR }}
+            ${{ env.TF_PLUGIN_CACHE_DIR }}
+            ${{ env.XDG_CACHE_HOME }}
+            ${{ env.npm_config_cache }}
+          key: pre-commit-${{ env.PYTHON_VERSION }}-${{ env.PRE_COMMIT_VERSION }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: mkdir
+        run: |
+          mkdir -p ${{ env.TF_DATA_DIR }}
+          mkdir -p ${{ env.TF_PLUGIN_CACHE_DIR }}
+
+      - uses: jdx/mise-action@v3
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pre-commit
+        run: pip install pre-commit==${{ env.PRE_COMMIT_VERSION }}
+
+      - name: Run pre-commit
+        env:
+          FORCE_COLOR: 1
+          PRE_COMMIT_COLOR: always
+        run: |
+          pre-commit run --all-files --show-diff-on-failure

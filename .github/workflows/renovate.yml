@@ -1,0 +1,114 @@
+name: Renovate
+
+on:
+  pull_request:
+    types: [ opened, edited, synchronize, reopened ]
+    paths:
+      - '.github/scripts/renovate.sh'
+      - '.github/workflows/renovate.yml'
+      - 'config.js'
+      - 'renovate.json5'
+  schedule:
+    - cron: '7 1 * * *'
+  workflow_dispatch:
+    inputs:
+      updateNotScheduled:
+        description: Whether to update branches when not scheduled. Renovate will not create branches outside of the schedule.
+        type: boolean
+        default: false
+      logFileLevel:
+        description: Log file logging level, defaults to debug.
+        type: choice
+        options:
+          - trace
+          - debug
+          - info
+          - warn
+          - error
+          - fatal
+        default: debug
+      logLevel:
+        description: Most commonly used to change from the default info to debug logging.
+        type: choice
+        options:
+          - trace
+          - debug
+          - info
+          - warn
+          - error
+          - fatal
+        default: info
+
+permissions: read-all
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    env:
+      LOG_FILE: renovate-log.ndjson
+      LOCAL_RENOVATE_DEPS_FILE: renovate-deps.json
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: '0'
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - name: Set env vars
+        run: |
+          echo "GITHUB_USERNAME=$(whoami)" >> $GITHUB_ENV
+          echo "GITHUB_HOME=${HOME}" >> $GITHUB_ENV
+          echo "GITHUB_UID=$(id -u)" >> $GITHUB_ENV
+
+      - name: Renovate
+        uses: renovatebot/github-action@v43.0.16
+        id: renovate
+        env:
+          # cache
+          CONTAINERBASE_CACHE_DIR: ${{ github.workspace }}/.cache/renovate/containerbase
+          PIP_CACHE_DIR: ${{ github.workspace }}/.cache/pip
+          RENOVATE_CACHE_DIR: ${{ github.workspace }}/.cache/renovate/cache
+          RENOVATE_CONTAINERBASE_DIR: ${{ github.workspace }}/.cache/renovate/containerbase
+          XDG_CACHE_HOME: ${{ github.workspace }}/.cache/xdg
+          npm_config_cache: ${{ github.workspace }}/.cache/npm
+
+          # generic
+          FORCE_COLOR: "1"
+          GITHUB_COM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOG_FILE_LEVEL: ${{ inputs.logFileLevel && inputs.logFileLevel || 'debug' }}
+          LOG_LEVEL: ${{ inputs.logLevel && inputs.logLevel || 'info' }}
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+          PIP_PROGRESS_BAR: "off"
+          RENOVATE_BASE_DIR: ${{ github.workspace }}
+          RENOVATE_DRY_RUN: ${{ github.event_name == 'pull_request' && 'full' || '' }}
+          RENOVATE_PLATFORM: ${{ github.event_name == 'pull_request' && 'local' || '' }}
+          RENOVATE_REPOSITORIES: ${{ github.event_name == 'pull_request' && '[]' || '' }}
+          RENOVATE_UPDATE_NOT_SCHEDULED: ${{ toJSON(
+            github.event_name == 'pull_request'
+            || (github.event_name == 'workflow_dispatch' && inputs.updateNotScheduled)
+            || false
+            ) }}
+        with:
+          configurationFile: config.js
+          docker-cmd-file: .github/scripts/renovate.sh
+          env-regex: "^(?:RENOVATE_\\w+|FORCE_COLOR|LOG_LEVEL|LOG_FILE|LOG_FILE_LEVEL|GITHUB_COM_TOKEN|NODE_OPTIONS|CONTAINERBASE_CACHE_DIR|XDG_CACHE_HOME|npm_config_cache|PIP_\\w+|GITHUB_USERNAME|GITHUB_HOME|GITHUB_UID|GITHUB_WORKSPACE)$"
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
+          docker-user: root
+          docker-volumes: |
+            ${{ github.workspace }}:${{ github.workspace }}
+
+      - name: Dependency report
+        if: ${{ ( success() || failure() ) && steps.renovate.conclusion != 'skipped' }}
+        run: ./.github/scripts/renovate-report.sh
+
+      - name: Upload Renovate logs
+        uses: actions/upload-artifact@v4
+        if: ${{ ( success() || failure() ) && steps.renovate.conclusion != 'skipped' }}
+        with:
+          name: renovate-logs
+          include-hidden-files: true
+          path: |
+            ${{ env.LOCAL_RENOVATE_DEPS_FILE }}
+            ${{ env.LOG_FILE }}
+            renovate-effective-config.log
