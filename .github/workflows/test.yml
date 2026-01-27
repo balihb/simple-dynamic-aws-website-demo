@@ -93,7 +93,7 @@ jobs:
           soft_fail: true
 
       - name: Sonar
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v7
         id: sonar
         continue-on-error: true
         env:
