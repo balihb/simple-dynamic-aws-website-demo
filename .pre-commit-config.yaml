@@ -20,7 +20,7 @@ repos:
     hooks:
       - id: editorconfig-checker
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.36.0
+    rev: 0.36.2
     hooks:
       - id: check-github-workflows
       - id: check-jsonschema
@@ -46,7 +46,7 @@ repos:
     hooks:
       - id: yamllint
   - repo: https://github.com/eslint/eslint
-    rev: v9.33.0
+    rev: v9.39.3
     hooks:
       - id: eslint
         additional_dependencies:
@@ -65,7 +65,7 @@ repos:
     hooks:
       - id: markdownlint
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.15.2
     hooks:
       # fix imports
       - id: ruff-check
